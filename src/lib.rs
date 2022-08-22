@@ -98,7 +98,11 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![warn(missing_docs)]
 #![warn(clippy::pedantic)]
-#![allow(clippy::missing_errors_doc, clippy::module_name_repetitions)]
+#![allow(
+    clippy::mismatching_type_param_order,
+    clippy::missing_errors_doc,
+    clippy::module_name_repetitions
+)]
 
 pub mod accumulated;
 pub mod accumulator;
