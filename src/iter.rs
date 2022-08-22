@@ -78,7 +78,7 @@ pub trait IteratorExt: Iterator {
     /// Basic usage:
     ///
     /// ```
-    /// use compound_error::{Accumulator, IteratorExt};
+    /// use fused_error::{Accumulator, IteratorExt};
     ///
     /// let results = [
     ///     Ok(1),
@@ -102,7 +102,7 @@ pub trait IteratorExt: Iterator {
     /// Here's the same example, but with [`filter_map`]:
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let results = [
     ///     Ok(1),
@@ -138,7 +138,7 @@ pub trait IteratorExt: Iterator {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, IteratorExt};
+    /// use fused_error::{Accumulator, IteratorExt};
     ///
     /// let results = [Err("foo"), Ok(()), Err("bar")];
     /// let mut accumulator = Accumulator::<&str>::new();
@@ -167,7 +167,7 @@ pub trait IteratorExt: Iterator {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, IteratorExt};
+    /// use fused_error::{Accumulator, IteratorExt};
     ///
     /// let results = [
     ///     Ok("foo"),

@@ -1,30 +1,30 @@
-//! Assigning [error accumulators] to working values with [`CompoundResult<T, E>`].
+//! Assigning [error accumulators] to working values with [`FusedResult<T, E>`].
 //!
 //! [error accumulators]: Accumulator
-//! [`CompoundResult<T, E>`]: CompoundResult
+//! [`FusedResult<T, E>`]: FusedResult
 //!
-//! # Compound Results
+//! # fused results
 //!
-//! A [compound result](CompoundResult) is meant for operations that always
+//! A [fused result](FusedResult) is meant for operations that always
 //! yield at least *some* usable value. For instance, in this crate's
-//! documentation found [here](crate), the example shows how a compound result
+//! documentation found [here](crate), the example shows how a fused result
 //! can be used to yield the sum of all valid inputs, yielding `0` even if every
 //! input failed.
 //!
 //! # Packed Results
 //!
 //! ```ignore
-//! type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
+//! type PackedResult<T, E> = Result<FusedResult<T, E>, E>;
 //! ```
 //!
-//! A [packed result](PackedResult) is a [compound result](CompoundResult)
+//! A [packed result](PackedResult) is a [fused result](FusedResult)
 //! which, itself, can have an [`Err`] case and short-circuit.
 //!
-//! While [compound results](CompoundResult) are good for reporting multiple
+//! While [fused results](FusedResult) are good for reporting multiple
 //! errors, a [packed result](PackedResult) represents an operation which might
 //! yield an internal error where panicking isn't desired.
 
-use crate::{accumulator, Accumulator, CompoundError, IntoResultParts};
+use crate::{accumulator, Accumulator, FusedError, IntoResultParts};
 use std::fmt::Debug;
 
 mod iter;
@@ -32,47 +32,47 @@ mod raw;
 
 pub use iter::{IntoIter, Iter, IterMut};
 
-/// A [`CompoundResult<T, E>`](CompoundResult) that can short-circuit with an
+/// A [`FusedResult<T, E>`](FusedResult) that can short-circuit with an
 /// error, dropping the "ok" value.
 ///
 /// This type alias is particularly useful for representing operations that can
-/// enter a state where any value yielded by the compound result should be seen
+/// enter a state where any value yielded by the fused result should be seen
 /// as invalid, such as reporting internal errors.
-pub type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
+pub type PackedResult<T, E> = Result<FusedResult<T, E>, E>;
 
 /// A result type that links an [`Accumulator<E>`] with a persistently "ok"
 /// value of `T`.
 ///
 /// # Panics
 ///
-/// Compound results will panic on drop if not handled correctly **even if no
+/// fused results will panic on drop if not handled correctly **even if no
 /// errors are present**:
 ///
 /// ```should_panic
-/// use compound_error::CompoundResult;
+/// use fused_error::FusedResult;
 ///
-/// let res = CompoundResult::<_, &str>::from_value(0);
+/// let res = FusedResult::<_, &str>::from_value(0);
 ///
-/// // We dropped a compound result without handling it, so panic!
+/// // We dropped a fused result without handling it, so panic!
 /// ```
 ///
-/// To prevent it from panicking on drop, you must terminate a compound error
+/// To prevent it from panicking on drop, you must terminate a fused error
 /// with one of the following methods:
 ///
 /// # Examples
 ///
-/// To see compound results in action, refer to the example in this crate's root
+/// To see fused results in action, refer to the example in this crate's root
 /// documentation [here](crate).
 ///
 /// # Method overview
 ///
-/// Here is the basic outline of the compound result methods at your disposal:
+/// Here is the basic outline of the fused result methods at your disposal:
 ///
 /// ## Creation
 ///
-/// Methods to create a new compound result:
+/// Methods to create a new fused result:
 ///
-/// * [`new`] for creating a compound result with an "ok" value and an error
+/// * [`new`] for creating a fused result with an "ok" value and an error
 ///   accumulator.
 /// * [`from_value`] if no error accumulator already exists
 ///
@@ -86,7 +86,7 @@ pub type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
 /// * [`acc_mut`] for getting a mutable reference to the internal error
 ///   accumulator
 ///
-/// For inspecting the general state of the compound result:
+/// For inspecting the general state of the fused result:
 ///
 /// * [`err_count`] for getting the amount of errors accumulated
 /// * [`is_ok`] returns `true` if the error count is zero.
@@ -113,17 +113,17 @@ pub type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
 /// * [`map`] maps the "ok" value
 /// * [`map_err`] maps any possible error values
 ///
-/// If you have a `CompoundResult<&T, E>`:
+/// If you have a `FusedResult<&T, E>`:
 ///
 /// * [`copied`] maps the "ok" value of `&T` to `T` using [`Copy`]
 /// * [`cloned`] maps the "ok" value of `&T` to `T` using [`Clone`]
 ///
-/// If you have a `CompoundResult<Result<T, A>, B>`, you can call [`transpose`]
-/// which will convert it into `Result<CompoundResult<T, B>, A>`.
+/// If you have a `FusedResult<Result<T, A>, B>`, you can call [`transpose`]
+/// which will convert it into `Result<FusedResult<T, B>, A>`.
 ///
-/// Or, if you have `CompoundResult<Result<T, IE>, E>` where `E` implements
-/// [`CompoundError`] and `IE` implements [`Into<E>`], you can call [`flatten`]
-/// which will convert it into `CompoundResult<Option<T>, E>`.
+/// Or, if you have `FusedResult<Result<T, IE>, E>` where `E` implements
+/// [`FusedError`] and `IE` implements [`Into<E>`], you can call [`flatten`]
+/// which will convert it into `FusedResult<Option<T>, E>`.
 ///
 /// ## Iteration
 ///
@@ -143,18 +143,18 @@ pub type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
 ///
 /// ## Destructuring
 ///
-/// These methods are useful for destructuring a compound result without any
+/// These methods are useful for destructuring a fused result without any
 /// form of panicking:
 ///
-/// * [`split`] destructures the compound error into its "ok" value and internal
+/// * [`split`] destructures the fused error into its "ok" value and internal
 ///   error accumulator
 /// * [`errors`] returns the vector of collected errors, dropping the "ok" value
 /// * [`err`] returns the reduced error if the error type implements
-///   [`CompoundError`] as an option
+///   [`FusedError`] as an option
 ///
 /// ## Extracting the "ok" value
 ///
-/// These methods extract the contained "ok" value in a [`CompoundResult<T, E>`]
+/// These methods extract the contained "ok" value in a [`FusedResult<T, E>`]
 /// when there are no errors present:
 ///
 /// * [`expect`] panics with a provided custom message
@@ -164,10 +164,10 @@ pub type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
 /// The panicking methods [`expect`] and [`unwrap`] require `T` and `E` to
 /// implement the [`Debug`] trait.
 ///
-/// ## Extracting a [`CompoundError`]
+/// ## Extracting a [`FusedError`]
 ///
 /// These methods extract the contained error value if any are present and `E`
-/// implements [`CompoundError`]:
+/// implements [`FusedError`]:
 ///
 /// * [`expect_err`] panics with a provided custom message
 /// * [`unwrap_err`] panics with a generic message
@@ -175,7 +175,7 @@ pub type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
 ///
 /// ## Conversion
 ///
-/// These methods convert the compound result into a potentially more usable
+/// These methods convert the fused result into a potentially more usable
 /// type
 ///
 /// * [`into_iter`] discards any errors and yields an iterator over the "ok"
@@ -185,74 +185,74 @@ pub type PackedResult<T, E> = Result<CompoundResult<T, E>, E>;
 /// * [`into_result`] drops the "ok" value if any errors are present, yielding a
 ///   [`Result<T, E>`](Result).
 ///
-/// If you want to destructure the compound result explicitly while discarding
+/// If you want to destructure the fused result explicitly while discarding
 /// its value, for whatever reason, use [`ignore`] which drops the "ok" value
 /// and discards any errors that are present.
 ///
-/// [`CompoundResult<T, E>`]: CompoundResult
+/// [`FusedResult<T, E>`]: FusedResult
 ///
-/// [`new`]: CompoundResult::new
-/// [`from_value`]: CompoundResult::from_value
-/// [`value`]: CompoundResult::value
-/// [`value_mut`]: CompoundResult::value_mut
-/// [`acc`]: CompoundResult::acc
-/// [`acc_mut`]: CompoundResult::acc_mut
-/// [`err_count`]: CompoundResult::err_count
-/// [`is_ok`]: CompoundResult::is_ok
-/// [`is_ok_and`]: CompoundResult::is_ok_and
-/// [`has_errors`]: CompoundResult::has_errors
-/// [`has_errors_and`]: CompoundResult::has_errors_and
-/// [`inspect`]: CompoundResult::inspect
-/// [`inspect_errors`]: CompoundResult::inspect_errors
-/// [`split`]: CompoundResult::split
-/// [`errors`]: CompoundResult::errors
-/// [`err`]: CompoundResult::err
-/// [`push_err`]: CompoundResult::push_err
-/// [`extend_err`]: CompoundResult::extend_err
-/// [`trace`]: CompoundResult::trace
-/// [`trace_iter`]: CompoundResult::trace_iter
-/// [`trace_with`]: CompoundResult::trace_with
-/// [`map`]: CompoundResult::map
-/// [`map_err`]: CompoundResult::map_err
-/// [`iter`]: CompoundResult::iter
-/// [`iter_mut`]: CompoundResult::iter_mut
-/// [`into_iter`]: CompoundResult::into_iter
-/// [`err_iter`]: CompoundResult::err_iter
-/// [`err_iter_mut`]: CompoundResult::err_iter_mut
-/// [`into_err_iter`]: CompoundResult::into_err_iter
-/// [`into_result`]: CompoundResult::into_result
-/// [`ignore`]: CompoundResult::ignore
-/// [`expect`]: CompoundResult::expect
-/// [`unwrap`]: CompoundResult::unwrap
-/// [`unwrap_unchecked`]: CompoundResult::unwrap_unchecked
-/// [`expect_err`]: CompoundResult::expect_err
-/// [`unwrap_err`]: CompoundResult::unwrap_err
-/// [`unwrap_err_unchecked`]: CompoundResult::unwrap_err_unchecked
-/// [`transpose`]: CompoundResult::transpose
-/// [`flatten`]: CompoundResult::flatten
-/// [`copied`]: CompoundResult::copied
-/// [`cloned`]: CompoundResult::cloned
+/// [`new`]: FusedResult::new
+/// [`from_value`]: FusedResult::from_value
+/// [`value`]: FusedResult::value
+/// [`value_mut`]: FusedResult::value_mut
+/// [`acc`]: FusedResult::acc
+/// [`acc_mut`]: FusedResult::acc_mut
+/// [`err_count`]: FusedResult::err_count
+/// [`is_ok`]: FusedResult::is_ok
+/// [`is_ok_and`]: FusedResult::is_ok_and
+/// [`has_errors`]: FusedResult::has_errors
+/// [`has_errors_and`]: FusedResult::has_errors_and
+/// [`inspect`]: FusedResult::inspect
+/// [`inspect_errors`]: FusedResult::inspect_errors
+/// [`split`]: FusedResult::split
+/// [`errors`]: FusedResult::errors
+/// [`err`]: FusedResult::err
+/// [`push_err`]: FusedResult::push_err
+/// [`extend_err`]: FusedResult::extend_err
+/// [`trace`]: FusedResult::trace
+/// [`trace_iter`]: FusedResult::trace_iter
+/// [`trace_with`]: FusedResult::trace_with
+/// [`map`]: FusedResult::map
+/// [`map_err`]: FusedResult::map_err
+/// [`iter`]: FusedResult::iter
+/// [`iter_mut`]: FusedResult::iter_mut
+/// [`into_iter`]: FusedResult::into_iter
+/// [`err_iter`]: FusedResult::err_iter
+/// [`err_iter_mut`]: FusedResult::err_iter_mut
+/// [`into_err_iter`]: FusedResult::into_err_iter
+/// [`into_result`]: FusedResult::into_result
+/// [`ignore`]: FusedResult::ignore
+/// [`expect`]: FusedResult::expect
+/// [`unwrap`]: FusedResult::unwrap
+/// [`unwrap_unchecked`]: FusedResult::unwrap_unchecked
+/// [`expect_err`]: FusedResult::expect_err
+/// [`unwrap_err`]: FusedResult::unwrap_err
+/// [`unwrap_err_unchecked`]: FusedResult::unwrap_err_unchecked
+/// [`transpose`]: FusedResult::transpose
+/// [`flatten`]: FusedResult::flatten
+/// [`copied`]: FusedResult::copied
+/// [`cloned`]: FusedResult::cloned
 #[derive(Debug)]
 #[must_use = "compund results will panic on drop if not handled"]
-pub struct CompoundResult<T, E> {
-    inner: raw::CompoundResult<T, E>,
+pub struct FusedResult<T, E> {
+    inner: raw::FusedResult<T, E>,
 }
 
-impl<T, E> CompoundResult<T, E> {
-    /// Constructs a new compound result from a value and an
+impl<T, E> FusedResult<T, E> {
+    /// Constructs a new fused result from a value and an
     /// [error accumulator](Accumulator).
     ///
     /// If you don't already have an error accumulator instantiated, consider
-    /// using [`from_value`](CompoundResult::from_value) instead.
+    /// using [`from_value`](FusedResult::from_value) instead.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, CompoundResult};
+    /// use fused_error::{Accumulator, FusedResult};
     ///
     /// let value = 1;
     /// let mut acc = Accumulator::<&str>::new();
-    /// let res = CompoundResult::new(value, acc);
+    /// let res = FusedResult::new(value, acc);
     ///
     /// // ...
     /// # unsafe { res.ignore(); }
@@ -260,41 +260,41 @@ impl<T, E> CompoundResult<T, E> {
     ///
     /// *Note*: You may have noticed the trailing ellipsis comment. This is
     /// because, as outlined in the documentation for
-    /// [`CompoundResult<T, E>`](Self), any unhandled result will panic on drop,
+    /// [`FusedResult<T, E>`](Self), any unhandled result will panic on drop,
     /// similar to [`Accumulator<E>`](Accumulator). That comment in any example
-    /// is meant to signify the compound result getting handled at a later point
+    /// is meant to signify the fused result getting handled at a later point
     /// in the program.
     #[inline]
     pub fn new(value: T, acc: Accumulator<E>) -> Self {
-        let inner = raw::CompoundResult::new(value, acc);
-        CompoundResult { inner }
+        let inner = raw::FusedResult::new(value, acc);
+        FusedResult { inner }
     }
 
-    /// Constructs a new compound result from a value.
+    /// Constructs a new fused result from a value.
     ///
     /// If you already have an [error accumulator](Accumulator) you wish to link
-    /// to the created compound result, consider using
-    /// [`new`](CompoundResult::new) instead.
+    /// to the created fused result, consider using
+    /// [`new`](FusedResult::new) instead.
     ///
-    /// Because compound results are so generalized, it can cause problems with
+    /// Because fused results are so generalized, it can cause problems with
     /// type inference. As such, `from_value` should probably get called with
     /// the 'turbofish' syntax: `::<>`. This helps the inference algorithm
     /// understand specifically which error type you're accumulating with this
-    /// compound result.
+    /// fused result.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{CompoundResult};
+    /// use fused_error::{FusedResult};
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     ///
     /// // ...
     /// # unsafe { res.ignore(); }
     /// ```
     #[inline]
     pub fn from_value(value: T) -> Self {
-        CompoundResult::new(value, Accumulator::new())
+        FusedResult::new(value, Accumulator::new())
     }
 
     /// Returns a reference to the contained value.
@@ -302,9 +302,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// assert_eq!(res.value(), &0);
     ///
     /// // ...
@@ -319,9 +319,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// *res.value_mut() = 42;
     ///
     /// assert_eq!(res.value(), &42);
@@ -338,9 +338,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, CompoundResult};
+    /// use fused_error::{Accumulator, FusedResult};
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// let acc: &Accumulator<&str> = res.acc();
     ///
     /// // ...
@@ -356,9 +356,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, CompoundResult};
+    /// use fused_error::{Accumulator, FusedResult};
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// let acc: &mut Accumulator<&str> = res.acc_mut();
     ///
     /// // ...
@@ -374,12 +374,12 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, CompoundResult};
+    /// use fused_error::{Accumulator, FusedResult};
     ///
     /// let mut acc = Accumulator::<&str>::new();
     /// acc.push("foo");
     ///
-    /// let mut res = CompoundResult::new(0, acc);
+    /// let mut res = FusedResult::new(0, acc);
     /// res.push_err("bar");
     ///
     /// assert_eq!(res.err_count(), 2);
@@ -397,12 +397,12 @@ impl<T, E> CompoundResult<T, E> {
     /// [error accumulator](Accumulator) is equal to zero.
     ///
     /// The inverse of this method is
-    /// [`has_errors`](CompoundResult::has_errors).
+    /// [`has_errors`](FusedResult::has_errors).
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// assert!(res.is_ok());
     ///
     /// res.push_err("foo");
@@ -419,20 +419,20 @@ impl<T, E> CompoundResult<T, E> {
 
     /// Returns `true` if the amount of collected errors within the contained
     /// [error accumulator](Accumulator) is equal to zero and the value inside
-    /// of this compound result matches a predicate.
+    /// of this fused result matches a predicate.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res1 = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res1 = FusedResult::<_, &str>::from_value(0);
     /// assert_eq!(res1.is_ok_and(|&x| x < 1), true);
     ///
-    /// let mut res2 = CompoundResult::<_, &str>::from_value(2);
+    /// let mut res2 = FusedResult::<_, &str>::from_value(2);
     /// assert_eq!(res2.is_ok_and(|&x| x < 1), false);
     ///
-    /// let mut res3 = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res3 = FusedResult::<_, &str>::from_value(0);
     /// res3.push_err("foo");
     /// assert_eq!(res3.is_ok_and(|&x| x < 1), false);
     ///
@@ -455,14 +455,14 @@ impl<T, E> CompoundResult<T, E> {
     /// Returns `true` if there are no errors present within the contained
     /// [error accumulator](Accumulator).
     ///
-    /// The inverse of this method is [`is_ok`](CompoundResult::is_ok).
+    /// The inverse of this method is [`is_ok`](FusedResult::is_ok).
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// assert!(!res.has_errors());
     ///
     /// res.push_err("foo");
@@ -478,26 +478,26 @@ impl<T, E> CompoundResult<T, E> {
     }
 
     /// Returns `true` if there are no errors present within the contained
-    /// [error accumulator](Accumulator) and the components of this compound
+    /// [error accumulator](Accumulator) and the components of this fused
     /// result matches a predicate.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, CompoundResult};
+    /// use fused_error::{Accumulator, FusedResult};
     ///
     /// fn errors_are_lowercase(acc: &Accumulator<&str>) -> bool {
     ///     acc.iter().all(|s| s.chars().all(char::is_lowercase))
     /// }
     ///
-    /// let mut res1 = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res1 = FusedResult::<_, &str>::from_value(0);
     /// res1.push_err("foo");
     /// assert_eq!(
     ///     res1.has_errors_and(|&x, acc| x < 1 && errors_are_lowercase(acc)),
     ///     true,
     /// );
     ///
-    /// let mut res2 = CompoundResult::<_, &str>::from_value(2);
+    /// let mut res2 = FusedResult::<_, &str>::from_value(2);
     /// res2.push_err("foo");
     /// res2.push_err("BAR");
     /// assert_eq!(
@@ -505,7 +505,7 @@ impl<T, E> CompoundResult<T, E> {
     ///     false,
     /// );
     ///
-    /// let mut res3 = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res3 = FusedResult::<_, &str>::from_value(0);
     /// assert_eq!(
     ///     res3.has_errors_and(|&x, acc| x < 1 && errors_are_lowercase(acc)),
     ///     false,
@@ -532,9 +532,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let res = CompoundResult::<i32, &str>::from_value(4);
+    /// let res = FusedResult::<i32, &str>::from_value(4);
     ///
     /// let x = res
     ///     .inspect(|x| println!("original: {x}"))
@@ -555,9 +555,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -576,21 +576,21 @@ impl<T, E> CompoundResult<T, E> {
         self
     }
 
-    /// Deconstructs the [`CompoundResult<T, E>`](Self) into its base
+    /// Deconstructs the [`FusedResult<T, E>`](Self) into its base
     /// components: the contained value, `T`, and the [`Accumulator<E>`].
     ///
-    /// Calling this method ensures the compound result **will not** panic on
+    /// Calling this method ensures the fused result **will not** panic on
     /// drop.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulator, CompoundResult};
+    /// use fused_error::{Accumulator, FusedResult};
     ///
     /// let mut acc = Accumulator::<&str>::new();
     /// acc.push("foo");
     ///
-    /// let mut res = CompoundResult::new(0, acc);
+    /// let mut res = FusedResult::new(0, acc);
     /// res.push_err("bar");
     ///
     /// let (x, acc) = res.split();
@@ -604,15 +604,15 @@ impl<T, E> CompoundResult<T, E> {
     /// Discards the contained value, returning a vector of all the accumulated
     /// errors.
     ///
-    /// Calling this method ensures the compound result **will not** panic on
+    /// Calling this method ensures the fused result **will not** panic on
     /// drop.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -627,7 +627,7 @@ impl<T, E> CompoundResult<T, E> {
     /// Drops the contained value and calls [`err`] on the underlying
     /// [error accumulator](Accumulator).
     ///
-    /// Calling this method ensures the compound result **will not** panic on
+    /// Calling this method ensures the fused result **will not** panic on
     /// drop.
     ///
     /// # Examples
@@ -640,7 +640,7 @@ impl<T, E> CompoundResult<T, E> {
     #[inline]
     pub fn err(mut self) -> Option<E>
     where
-        E: CompoundError,
+        E: FusedError,
     {
         unsafe { self.inner.take_err() }
     }
@@ -753,15 +753,15 @@ impl<T, E> CompoundResult<T, E> {
         self.inner.errors.trace_with(f);
     }
 
-    /// Maps a `CompoundResult<T, E>` to `CompoundResult<U, E>` by applying a
+    /// Maps a `FusedResult<T, E>` to `FusedResult<U, E>` by applying a
     /// function to the contained value.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let res = CompoundResult::<_, &str>::from_value(21);
+    /// let res = FusedResult::<_, &str>::from_value(21);
     /// let mut mapped = res.map(|x| x * 2);
     /// assert_eq!(mapped.value(), &42);
     ///
@@ -769,23 +769,23 @@ impl<T, E> CompoundResult<T, E> {
     /// # unsafe { mapped.ignore(); }
     /// ```
     #[inline]
-    pub fn map<U, O>(mut self, op: O) -> CompoundResult<U, E>
+    pub fn map<U, O>(mut self, op: O) -> FusedResult<U, E>
     where
         O: FnOnce(T) -> U,
     {
         let (value, acc) = unsafe { self.inner.split() };
-        CompoundResult::new(op(value), acc)
+        FusedResult::new(op(value), acc)
     }
 
-    /// Maps a `CompoundResult<T, E>` to `CompoundResult<T, F>` by applying a
+    /// Maps a `FusedResult<T, E>` to `FusedResult<T, F>` by applying a
     /// function to every accumulated error.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -794,13 +794,13 @@ impl<T, E> CompoundResult<T, E> {
     /// ```
     ///
     #[inline]
-    pub fn map_err<F, O>(mut self, op: O) -> CompoundResult<T, F>
+    pub fn map_err<F, O>(mut self, op: O) -> FusedResult<T, F>
     where
         O: FnMut(E) -> F,
     {
         let (value, acc) = unsafe { self.inner.split() };
         let acc = acc.into_iter().map(op).collect();
-        CompoundResult::new(value, acc)
+        FusedResult::new(value, acc)
     }
 
     /// Returns an iterator over the contained value.
@@ -810,9 +810,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// let mut iter = res.iter();
     /// assert_eq!(iter.next(), Some(&0));
     /// assert_eq!(iter.next(), None);
@@ -833,9 +833,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     ///
     /// for v in res.iter_mut() {
     ///     *v = 42;
@@ -851,20 +851,20 @@ impl<T, E> CompoundResult<T, E> {
 
     /// Returns a consuming iterator over the contained value.
     ///
-    /// Calling this method ensures the compound result **will not** panic on
+    /// Calling this method ensures the fused result **will not** panic on
     /// drop.
     ///
     /// # Safety
     ///
     /// This discards all possibly contained errors, making it about as
-    /// dangerous as [`unwrap_unchecked`](CompoundResult::unwrap_unchecked).
+    /// dangerous as [`unwrap_unchecked`](FusedResult::unwrap_unchecked).
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -883,9 +883,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -906,9 +906,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, String>::from_value(0);
+    /// let mut res = FusedResult::<_, String>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -925,15 +925,15 @@ impl<T, E> CompoundResult<T, E> {
     /// Drops the contained value and returns a consuming iterator over the
     /// contained errors.
     ///
-    /// Calling this method ensures the compound result **will not** panic on
+    /// Calling this method ensures the fused result **will not** panic on
     /// drop.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -951,30 +951,30 @@ impl<T, E> CompoundResult<T, E> {
     /// if errors are present, `into_result` returns `Err(E)`, dropping the
     /// contained value.
     ///
-    /// Calling this method ensures the compound result **will not** panic on
+    /// Calling this method ensures the fused result **will not** panic on
     /// drop.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, CompoundResult};
+    /// use fused_error::{Accumulated, FusedResult};
     ///
-    /// let mut res = CompoundResult::<_, Accumulated<&str>>::from_value(0);
+    /// let mut res = FusedResult::<_, Accumulated<&str>>::from_value(0);
     /// assert_eq!(res.into_result(), Ok(0));
     /// ```
     #[inline]
     pub fn into_result(mut self) -> Result<T, E>
     where
-        E: CompoundError,
+        E: FusedError,
     {
         unsafe { self.inner.result() }
     }
 
     /// Handles this accumulator, discarding all errors. Unlike
-    /// [`unwrap`](CompoundResult::unwrap) or similar methods, this method does
+    /// [`unwrap`](FusedResult::unwrap) or similar methods, this method does
     /// not panic.
     ///
-    /// Calling this method ensures the compound result **will not** panic on
+    /// Calling this method ensures the fused result **will not** panic on
     /// drop.
     ///
     /// # Safety
@@ -985,9 +985,9 @@ impl<T, E> CompoundResult<T, E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     ///
     /// // TODO: properly handle result
     /// unsafe { res.ignore() };
@@ -998,7 +998,7 @@ impl<T, E> CompoundResult<T, E> {
     }
 }
 
-impl<T, E> CompoundResult<T, E>
+impl<T, E> FusedResult<T, E>
 where
     T: Debug,
     E: Debug,
@@ -1014,9 +1014,9 @@ where
     /// # Examples
     ///
     /// ```should_panic
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     ///
@@ -1041,16 +1041,16 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// assert_eq!(res.unwrap(), 0);
     /// ```
     ///
     /// ```should_panic
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// res.push_err("foo");
     /// res.unwrap(); // panics due to previous appended error
     /// ```
@@ -1074,9 +1074,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
-    /// let mut res = CompoundResult::<_, &str>::from_value(0);
+    /// let mut res = FusedResult::<_, &str>::from_value(0);
     /// assert_eq!(unsafe { res.unwrap_unchecked() }, 0);
     /// ```
     #[must_use]
@@ -1089,7 +1089,7 @@ where
         self.inner.take_value()
     }
 
-    /// Returns the contained error reduced via [`CompoundError`], consuming the
+    /// Returns the contained error reduced via [`FusedError`], consuming the
     /// `self` value.
     ///
     /// # Panics
@@ -1100,16 +1100,16 @@ where
     /// # Examples
     ///
     /// ```should_panic
-    /// use compound_error::{Accumulated, CompoundResult};
+    /// use fused_error::{Accumulated, FusedResult};
     ///
-    /// let mut res = CompoundResult::<_, Accumulated<&str>>::from_value(0);
+    /// let mut res = FusedResult::<_, Accumulated<&str>>::from_value(0);
     /// res.expect_err("testing expect_err"); // panics with "testing expect_err: []"
     /// ```
     #[inline]
     #[track_caller]
     pub fn expect_err(mut self, msg: &str) -> E
     where
-        E: CompoundError,
+        E: FusedError,
     {
         if cfg!(debug_assertions) && !self.has_errors() {
             unsafe { self.inner.fail_with(msg) };
@@ -1117,7 +1117,7 @@ where
         unsafe { self.inner.take_err().unwrap_unchecked() }
     }
 
-    /// Returns the contained error reduced via [`CompoundError`], consuming the
+    /// Returns the contained error reduced via [`FusedError`], consuming the
     /// `self` value.
     ///
     /// # Panics
@@ -1128,9 +1128,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, CompoundResult};
+    /// use fused_error::{Accumulated, FusedResult};
     ///
-    /// let mut res = CompoundResult::<_, Accumulated<&str>>::from_value(0);
+    /// let mut res = FusedResult::<_, Accumulated<&str>>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     /// assert_eq!(res.unwrap_err(), ["foo", "bar"]);
@@ -1139,7 +1139,7 @@ where
     #[track_caller]
     pub fn unwrap_err(mut self) -> E
     where
-        E: CompoundError,
+        E: FusedError,
     {
         if cfg!(debug_assertions) && !self.has_errors() {
             unsafe { self.inner.fail("unwrap_err") };
@@ -1147,7 +1147,7 @@ where
         unsafe { self.inner.take_err().unwrap_unchecked() }
     }
 
-    /// Returns the contained error reduced via [`CompoundError`], consuming the
+    /// Returns the contained error reduced via [`FusedError`], consuming the
     /// `self` value, without checking if any errors are accumulated.
     ///
     /// # Safety
@@ -1158,9 +1158,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, CompoundResult};
+    /// use fused_error::{Accumulated, FusedResult};
     ///
-    /// let mut res = CompoundResult::<_, Accumulated<&str>>::from_value(0);
+    /// let mut res = FusedResult::<_, Accumulated<&str>>::from_value(0);
     /// res.push_err("foo");
     /// res.push_err("bar");
     /// assert_eq!(unsafe { res.unwrap_err_unchecked() }, ["foo", "bar"]);
@@ -1169,7 +1169,7 @@ where
     #[track_caller]
     pub unsafe fn unwrap_err_unchecked(mut self) -> E
     where
-        E: CompoundError,
+        E: FusedError,
     {
         if cfg!(debug_assertions) && !self.has_errors() {
             self.inner.fail("unwrap_err");
@@ -1178,36 +1178,36 @@ where
     }
 }
 
-impl<T, A, B> CompoundResult<Result<T, A>, B> {
-    /// Converts a `CompoundResult<Result<T, A>, B>` into a
-    /// `Result<CompoundResult<T, B>, A>`.
+impl<T, A, B> FusedResult<Result<T, A>, B> {
+    /// Converts a `FusedResult<Result<T, A>, B>` into a
+    /// `Result<FusedResult<T, B>, A>`.
     ///
     /// # Safety
     ///
-    /// This drops all of the accumulated errors within the compound result if
+    /// This drops all of the accumulated errors within the fused result if
     /// the internal result is an [`Err`] value.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
     /// let inner: Result<u32, i32> = Err(0);
     ///
-    /// let mut compound_result = CompoundResult::<_, &str>::from_value(inner);
-    /// compound_result.push_err("foo");
-    /// compound_result.push_err("bar");
+    /// let mut fused_result = FusedResult::<_, &str>::from_value(inner);
+    /// fused_result.push_err("foo");
+    /// fused_result.push_err("bar");
     ///
     /// // SAFETY: This *will* drop the previously appended errors because the
     /// // inner result is an `Err` value:
-    /// let result: Result<CompoundResult<u32, &str>, i32> = unsafe { compound_result.transpose() };
+    /// let result: Result<FusedResult<u32, &str>, i32> = unsafe { fused_result.transpose() };
     /// assert_eq!(result.unwrap_err(), 0)
     /// ```
 
-    pub unsafe fn transpose(mut self) -> Result<CompoundResult<T, B>, A> {
+    pub unsafe fn transpose(mut self) -> Result<FusedResult<T, B>, A> {
         let (res, acc) = self.inner.split();
         match res {
-            Ok(t) => Ok(CompoundResult::new(t, acc)),
+            Ok(t) => Ok(FusedResult::new(t, acc)),
             Err(e) => {
                 acc.ignore();
                 Err(e)
@@ -1216,26 +1216,26 @@ impl<T, A, B> CompoundResult<Result<T, A>, B> {
     }
 }
 
-impl<T, E, IE> CompoundResult<Result<T, IE>, E> {
-    /// Flattens a `CompoundResult<Result<T, IE>, E>` into a
-    /// `CompoundResult<Option<T>, E>` where `IE` implements [`Into<E>`](Into).
+impl<T, E, IE> FusedResult<Result<T, IE>, E> {
+    /// Flattens a `FusedResult<Result<T, IE>, E>` into a
+    /// `FusedResult<Option<T>, E>` where `IE` implements [`Into<E>`](Into).
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
     /// let inner: Result<i32, &str> = Err("foo");
     ///
-    /// let mut compound_result = CompoundResult::<_, &str>::from_value(inner);
-    /// compound_result.push_err("bar");
-    /// compound_result.push_err("baz");
+    /// let mut fused_result = FusedResult::<_, &str>::from_value(inner);
+    /// fused_result.push_err("bar");
+    /// fused_result.push_err("baz");
     ///
-    /// let flattened = compound_result.flatten();
+    /// let flattened = fused_result.flatten();
     /// assert!(flattened.value().is_none());
     /// assert_eq!(flattened.errors(), ["bar", "baz", "foo"]);
     /// ```
-    pub fn flatten(mut self) -> CompoundResult<Option<T>, E>
+    pub fn flatten(mut self) -> FusedResult<Option<T>, E>
     where
         IE: Into<E>,
     {
@@ -1247,57 +1247,57 @@ impl<T, E, IE> CompoundResult<Result<T, IE>, E> {
                 None
             }
         };
-        CompoundResult::new(opt, acc)
+        FusedResult::new(opt, acc)
     }
 }
 
-impl<T, E> CompoundResult<&T, E> {
-    /// Maps a `CompoundResult<&T, E>` to a `CompoundResult<T, E>` by copying
+impl<T, E> FusedResult<&T, E> {
+    /// Maps a `FusedResult<&T, E>` to a `FusedResult<T, E>` by copying
     /// the "ok" contents.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
     /// let value = 1;
     ///
-    /// let res = CompoundResult::<&i32, &str>::from_value(&value);
+    /// let res = FusedResult::<&i32, &str>::from_value(&value);
     /// assert_eq!(res.value(), &&1);
-    /// let copied: CompoundResult<i32, &str> = res.copied();
+    /// let copied: FusedResult<i32, &str> = res.copied();
     /// assert_eq!(copied.value(), &1);
     ///
     /// // ...
     /// # unsafe { copied.ignore() };
     /// ```
     #[inline]
-    pub fn copied(self) -> CompoundResult<T, E>
+    pub fn copied(self) -> FusedResult<T, E>
     where
         T: Copy,
     {
         self.map(|&t| t)
     }
 
-    /// Maps a `CompoundResult<&T, E>` to a `CompoundResult<T, E>` by cloning
+    /// Maps a `FusedResult<&T, E>` to a `FusedResult<T, E>` by cloning
     /// the "ok" contents.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
     /// let value = 1;
     ///
-    /// let res = CompoundResult::<&i32, &str>::from_value(&value);
+    /// let res = FusedResult::<&i32, &str>::from_value(&value);
     /// assert_eq!(res.value(), &&1);
-    /// let cloned: CompoundResult<i32, &str> = res.cloned();
+    /// let cloned: FusedResult<i32, &str> = res.cloned();
     /// assert_eq!(cloned.value(), &1);
     ///
     /// // ...
     /// # unsafe { cloned.ignore() };
     /// ```
     #[inline]
-    pub fn cloned(self) -> CompoundResult<T, E>
+    pub fn cloned(self) -> FusedResult<T, E>
     where
         T: Clone,
     {
@@ -1305,53 +1305,53 @@ impl<T, E> CompoundResult<&T, E> {
     }
 }
 
-impl<T, E> CompoundResult<&mut T, E> {
-    /// Maps a `CompoundResult<&mut T, E>` to a `CompoundResult<T, E>` by
+impl<T, E> FusedResult<&mut T, E> {
+    /// Maps a `FusedResult<&mut T, E>` to a `FusedResult<T, E>` by
     /// copying the "ok" contents.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
     /// let mut value = 1;
     ///
-    /// let res = CompoundResult::<&mut i32, &str>::from_value(&mut value);
+    /// let res = FusedResult::<&mut i32, &str>::from_value(&mut value);
     /// assert_eq!(res.value(), &&mut 1);
-    /// let copied: CompoundResult<i32, &str> = res.copied();
+    /// let copied: FusedResult<i32, &str> = res.copied();
     /// assert_eq!(copied.value(), &1);
     ///
     /// // ...
     /// # unsafe { copied.ignore() };
     /// ```
     #[inline]
-    pub fn copied(self) -> CompoundResult<T, E>
+    pub fn copied(self) -> FusedResult<T, E>
     where
         T: Copy,
     {
         self.map(|&mut t| t)
     }
 
-    /// Maps a `CompoundResult<&mut T, E>` to a `CompoundResult<T, E>` by
+    /// Maps a `FusedResult<&mut T, E>` to a `FusedResult<T, E>` by
     /// cloning the "ok" contents.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::CompoundResult;
+    /// use fused_error::FusedResult;
     ///
     /// let mut value = 1;
     ///
-    /// let res = CompoundResult::<&mut i32, &str>::from_value(&mut value);
+    /// let res = FusedResult::<&mut i32, &str>::from_value(&mut value);
     /// assert_eq!(res.value(), &&mut 1);
-    /// let cloned: CompoundResult<i32, &str> = res.cloned();
+    /// let cloned: FusedResult<i32, &str> = res.cloned();
     /// assert_eq!(cloned.value(), &1);
     ///
     /// // ...
     /// # unsafe { cloned.ignore() };
     /// ```
     #[inline]
-    pub fn cloned(self) -> CompoundResult<T, E>
+    pub fn cloned(self) -> FusedResult<T, E>
     where
         T: Clone,
     {
@@ -1359,9 +1359,9 @@ impl<T, E> CompoundResult<&mut T, E> {
     }
 }
 
-unsafe impl<T, E> IntoResultParts for CompoundResult<T, E>
+unsafe impl<T, E> IntoResultParts for FusedResult<T, E>
 where
-    E: CompoundError,
+    E: FusedError,
 {
     type Ok = T;
     type Err = E;
@@ -1372,14 +1372,14 @@ where
     }
 }
 
-impl<T: Default, E> Default for CompoundResult<T, E> {
+impl<T: Default, E> Default for FusedResult<T, E> {
     #[inline]
     fn default() -> Self {
-        CompoundResult::from_value(T::default())
+        FusedResult::from_value(T::default())
     }
 }
 
-impl<T, R> FromIterator<R> for CompoundResult<T, R::Err>
+impl<T, R> FromIterator<R> for FusedResult<T, R::Err>
 where
     T: FromIterator<R::Ok>,
     R: IntoResultParts,
@@ -1387,6 +1387,6 @@ where
     fn from_iter<I: IntoIterator<Item = R>>(iter: I) -> Self {
         let mut acc = Accumulator::<R::Err>::new();
         let collected: T = iter.into_iter().filter_map(|res| acc.handle(res)).collect();
-        CompoundResult::new(collected, acc)
+        FusedResult::new(collected, acc)
     }
 }

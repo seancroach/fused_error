@@ -1,4 +1,4 @@
-use crate::{Accumulator, CompoundError};
+use crate::{Accumulator, FusedError};
 
 use std::{
     fmt::{self, Debug},
@@ -6,15 +6,15 @@ use std::{
 };
 
 #[must_use]
-pub(crate) struct CompoundResult<T, E> {
+pub(crate) struct FusedResult<T, E> {
     pub ok: ManuallyDrop<T>,
     pub errors: Accumulator<E>,
 }
 
-impl<T, E> CompoundResult<T, E> {
+impl<T, E> FusedResult<T, E> {
     #[inline]
     pub fn new(value: T, acc: Accumulator<E>) -> Self {
-        CompoundResult {
+        FusedResult {
             ok: ManuallyDrop::new(value),
             errors: acc,
         }
@@ -45,7 +45,7 @@ impl<T, E> CompoundResult<T, E> {
     #[inline]
     pub unsafe fn take_err(&mut self) -> Option<E>
     where
-        E: CompoundError,
+        E: FusedError,
     {
         ManuallyDrop::drop(&mut self.ok);
         self.errors.inner.reduce()
@@ -54,7 +54,7 @@ impl<T, E> CompoundResult<T, E> {
     #[inline]
     pub unsafe fn result(&mut self) -> Result<T, E>
     where
-        E: CompoundError,
+        E: FusedError,
     {
         match self.errors.inner.reduce() {
             Some(err) => {
@@ -89,10 +89,10 @@ impl<T, E> CompoundResult<T, E> {
         E: Debug,
     {
         let msg = match self.errors.len() {
-            0 => format!("called `CompoundResult::{method}` when no errors were present"),
+            0 => format!("called `FusedResult::{method}` when no errors were present"),
             n => {
                 format!(
-                    "called `CompoundResult::{method}` without handling {n} error{}",
+                    "called `FusedResult::{method}` without handling {n} error{}",
                     if n == 1 { "" } else { "s" },
                 )
             }
@@ -109,16 +109,16 @@ impl<T, E> CompoundResult<T, E> {
 }
 
 // We manually implement `Debug` to omit the `ManuallyDrop` indirection.
-impl<T: Debug, E: Debug> Debug for CompoundResult<T, E> {
+impl<T: Debug, E: Debug> Debug for FusedResult<T, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CompoundResult")
+        f.debug_struct("FusedResult")
             .field("ok", &*self.ok)
             .field("errors", &self.errors)
             .finish()
     }
 }
 
-impl<T, E> Drop for CompoundResult<T, E> {
+impl<T, E> Drop for FusedResult<T, E> {
     fn drop(&mut self) {
         if cfg!(debug_assertions) && !self.errors.is_handled() {
             // SAFETY: If the accumulator didn't get handled correctly, it's
@@ -127,9 +127,9 @@ impl<T, E> Drop for CompoundResult<T, E> {
 
             let len = self.errors.len();
             match len {
-                0 => panic!("`compound_error::CompoundResult` dropped without getting handled"),
+                0 => panic!("`fused_error::FusedResult` dropped without getting handled"),
                 n => panic!(
-                    "`compound_error::CompoundResult` dropped without handling {n} error{}",
+                    "`fused_error::FusedResult` dropped without handling {n} error{}",
                     if n == 1 { "" } else { "s" },
                 ),
             }

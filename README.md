@@ -1,18 +1,18 @@
-# compound_error
+# fused_error
 
 A simple library for working with composable errors.
 
 [![Build Status]][actions]
 [![Latest Version]][crates.io]
 
-[Build Status]: https://img.shields.io/github/workflow/status/seancroach/compound_error/ci?logo=github
-[actions]: https://github.com/seancroach/compound_error/actions/workflows/ci.yml
-[Latest Version]: https://img.shields.io/crates/v/compound_errorlogo=rust
-[crates.io]: https://crates.io/crates/compound_error
+[Build Status]: https://img.shields.io/github/workflow/status/seancroach/fused_error/ci?logo=github
+[actions]: https://github.com/seancroach/fused_error/actions/workflows/ci.yml
+[Latest Version]: https://img.shields.io/crates/v/fused_errorlogo=rust
+[crates.io]: https://crates.io/crates/fused_error
 
 ## Documentation
 
-[Module documentation with examples](https://docs.rs/compound_error). The module documentation also
+[Module documentation with examples](https://docs.rs/fused_error). The module documentation also
 includes a comprehensive description of the syntax supported for parsing hex colors.
 
 ## Usage
@@ -21,7 +21,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-compound_error = "0.1.0"
+fused_error = "0.1.0"
 ```
 
 Here's a simple example to demonstrate the power of composable errors:
@@ -33,14 +33,14 @@ use std::{
     str::FromStr
 };
 
-use compound_error::{Accumulator, CompoundResult, IteratorExt};
+use fused_error::{Accumulator, FusedResult, IteratorExt};
 
 /// Take an iterator of textual data, adding up all of the parsed numbers.
 ///
 /// Unlike the standard way of returning a `Result<N, N::Err>`, this doesn't
 /// short-circuit, it keeps track of the current sum, and reports any
 /// further diagnostics past the first failure.
-fn calculate_sum<N, E, I>(iter: I) -> CompoundResult<N, N::Err>
+fn calculate_sum<N, E, I>(iter: I) -> FusedResult<N, N::Err>
 where
     N: FromStr + Sum,
     E: AsRef<str>,
@@ -52,21 +52,21 @@ where
     let sum = iter
         .into_iter()
         .map(|item| item.as_ref().parse::<N>())
-        // `compound_error` adds certain methods to iterators; no more
+        // `fused_error` adds certain methods to iterators; no more
         // disrupting iterator chains and `collect` hells for results!
         .accumulate(&mut acc)
         .sum();
-    // Compound results let you easily pass around error accumulators and
+    // fused results let you easily pass around error accumulators and
     // are perfect for cases where a yielded "ok" value and an error case
     // aren't mutually exclusive.
-    CompoundResult::new(sum, acc)
+    FusedResult::new(sum, acc)
 }
 
-let result: CompoundResult<i32, _> = calculate_sum(["1", "2", "3", "4"]);
+let result: FusedResult<i32, _> = calculate_sum(["1", "2", "3", "4"]);
 assert_eq!(result.value(), &10);
 assert_eq!(result.errors(), []);
 
-let result: CompoundResult<i8, _> = calculate_sum(["", "-129", "foo", "128"]);
+let result: FusedResult<i8, _> = calculate_sum(["", "-129", "foo", "128"]);
 assert_eq!(result.value(), &0);
 assert_eq!(
     result
@@ -82,7 +82,7 @@ assert_eq!(
     ],
 );
 
-let result: CompoundResult<u8, _> = calculate_sum(["-1", "", "0", "1"]);
+let result: FusedResult<u8, _> = calculate_sum(["-1", "", "0", "1"]);
 assert_eq!(result.value(), &1);
 assert_eq!(
     result
@@ -95,10 +95,10 @@ assert_eq!(
 ```
 
 Or, when using the `syn` feature for increased interoperability, here's an
-example of `compound_error` assisting in procedural macros:
+example of `fused_error` assisting in procedural macros:
 
 ```rust
-use compound_error::{Accumulator, CompoundError};
+use fused_error::{Accumulator, FusedError};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{AttributeArgs, DeriveInput, ItemFn};

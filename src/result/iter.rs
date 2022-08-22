@@ -1,11 +1,11 @@
 use std::iter::FusedIterator;
 
-/// An iterator over a reference to the "ok" value in a [`CompoundResult`].
+/// An iterator over a reference to the "ok" value in a [`FusedResult`].
 ///
-/// This struct is created by the [`CompoundResult::iter`] method.
+/// This struct is created by the [`FusedResult::iter`] method.
 ///
-/// [`CompoundResult`]: crate::CompoundResult
-/// [`CompoundResult::iter`]: crate::CompoundResult::iter
+/// [`FusedResult`]: crate::FusedResult
+/// [`FusedResult::iter`]: crate::FusedResult::iter
 pub struct Iter<'a, T> {
     pub(crate) inner: Option<&'a T>,
 }
@@ -48,12 +48,12 @@ impl<T> Clone for Iter<'_, T> {
 }
 
 /// An iterator over a mutable reference to the "ok" value in a
-/// [`CompoundResult`].
+/// [`FusedResult`].
 ///
-/// This struct is created by the [`CompoundResult::iter_mut`] method.
+/// This struct is created by the [`FusedResult::iter_mut`] method.
 ///
-/// [`CompoundResult`]: crate::CompoundResult
-/// [`CompoundResult::iter_mut`]: crate::CompoundResult::iter_mut
+/// [`FusedResult`]: crate::FusedResult
+/// [`FusedResult::iter_mut`]: crate::FusedResult::iter_mut
 pub struct IterMut<'a, T> {
     pub(crate) inner: Option<&'a mut T>,
 }
@@ -74,10 +74,10 @@ impl<T> ExactSizeIterator for IterMut<'_, T> {}
 
 impl<T> FusedIterator for IterMut<'_, T> {}
 
-/// An iterator over  the "ok" value in a [`CompoundResult`].
+/// An iterator over  the "ok" value in a [`FusedResult`].
 ///
-/// This struct is created by the [`CompoundResult::into_iter`] method.
+/// This struct is created by the [`FusedResult::into_iter`] method.
 ///
-/// [`CompoundResult`]: crate::CompoundResult
-/// [`CompoundResult::into_iter`]: crate::CompoundResult::into_iter
+/// [`FusedResult`]: crate::FusedResult
+/// [`FusedResult::into_iter`]: crate::FusedResult::into_iter
 pub type IntoIter<T> = std::result::IntoIter<T>;

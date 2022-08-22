@@ -1,4 +1,4 @@
-use crate::CompoundError;
+use crate::FusedError;
 
 use std::fmt::{self, Debug};
 
@@ -6,7 +6,7 @@ use std::fmt::{self, Debug};
 /// state.
 #[must_use = "accumulators will panic on drop if not handled"]
 pub(crate) struct Accumulator<E> {
-    // This is `pub` for low-level access by result::raw::CompoundResult.
+    // This is `pub` for low-level access by result::raw::FusedResult.
     pub errors: Option<Vec<E>>,
 }
 
@@ -97,7 +97,7 @@ impl<E> Accumulator<E> {
         self.errors.take().unwrap_unchecked()
     }
 
-    /// Returns the reduced compound error, leaving `None` in its place.
+    /// Returns the reduced fused error, leaving `None` in its place.
     ///
     /// # Safety
     ///
@@ -113,10 +113,10 @@ impl<E> Accumulator<E> {
     #[track_caller]
     pub unsafe fn reduce(&mut self) -> Option<E>
     where
-        E: CompoundError,
+        E: FusedError,
     {
         // SAFETY: safety is ensured by the caller
-        self.take().into_iter().reduce(CompoundError::merge)
+        self.take().into_iter().reduce(FusedError::merge)
     }
 
     /// Discards the collected errors, leaving `None` in its place.
@@ -167,9 +167,9 @@ impl<E> Drop for Accumulator<E> {
                 let len = errors.len();
 
                 match len {
-                    0 => panic!("compound_error::Accumulator dropped without getting handled"),
+                    0 => panic!("fused_error::Accumulator dropped without getting handled"),
                     n => panic!(
-                        "compound_error::Accumulator dropped with {n} unhandled error{}",
+                        "fused_error::Accumulator dropped with {n} unhandled error{}",
                         if n == 1 { "" } else { "s" },
                     ),
                 }

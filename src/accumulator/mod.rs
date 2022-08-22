@@ -9,7 +9,7 @@
 //! Accumulators will panic on drop if not handled correctly **even if empty**:
 //!
 //! ```should_panic
-//! use compound_error::Accumulator;
+//! use fused_error::Accumulator;
 //!
 //! let mut acc = Accumulator::<&str>::new();
 //!
@@ -30,7 +30,7 @@
 //! Basic usage:
 //!
 //! ```
-//! use compound_error::Accumulator;
+//! use fused_error::Accumulator;
 //!
 //! // Note that the turbofish operator is typically required for `new`:
 //! let mut acc = Accumulator::<String>::new();
@@ -74,10 +74,10 @@
 //! assert_eq!(acc.into_vec(), ["foo", "bar", "baz", "qux", "quux"]);
 //! ```
 //!
-//! Using an error that implements `CompoundError`:
+//! Using an error that implements `FusedError`:
 //!
 //! ```
-//! use compound_error::{Accumulated, Accumulator};
+//! use fused_error::{Accumulated, Accumulator};
 //!
 //! let mut acc = Accumulator::<Accumulated<&str>>::new();
 //! assert_eq!(acc.finish(), Ok(()));
@@ -104,12 +104,12 @@
 //! assert_eq!(using_checkpoint().unwrap_err(), ["baz", "qux"])
 //! ```
 //!
-//! The following uses the `syn` feature to implement [`CompoundError`] on
+//! The following uses the `syn` feature to implement [`FusedError`] on
 //! [`syn::Error`]:
 //!
 //! ```
 //! # extern crate proc_macro;
-//! use compound_error::{Accumulator, CompoundError};
+//! use fused_error::{Accumulator, FusedError};
 //! use proc_macro::TokenStream;
 //! use proc_macro2::TokenStream as TokenStream2;
 //! use syn::{AttributeArgs, DeriveInput, ItemFn};
@@ -223,7 +223,7 @@
 //! with iterator adapters like the following is encouraged instead:
 //!
 //! ```
-//! use compound_error::Accumulator;
+//! use fused_error::Accumulator;
 //!
 //! let mut acc = Accumulator::<&str>::new();
 //! acc.push("foo");
@@ -248,14 +248,14 @@
 //! lifetime. It will panic otherwise.** For more information, look above at the
 //! "Panics" section.
 //!
-//! If the error type **does not** implement [`CompoundError`], there are only
+//! If the error type **does not** implement [`FusedError`], there are only
 //! two methods to properly handle an accumulator:
 //!
 //! * [`into_vec`] which returns a vector of the collected errors
 //! * [`ignore`] which is considered unsafe because it silently discards all
 //!   errors
 //!
-//! However, if the error type **does** implement [`CompoundError`], you can use
+//! However, if the error type **does** implement [`FusedError`], you can use
 //! one of the following:
 //!
 //! * [`finish`] which returns `Result<(), E>`
@@ -263,7 +263,7 @@
 //! * [`err_or`] which returns `Result<T, E>`
 //! * [`err_or_else`] which is the lazy version of [`err_or`]
 //!
-//! Then, if the error type **does** implement [`CompoundError`], you can use
+//! Then, if the error type **does** implement [`FusedError`], you can use
 //! [`checkpoint`] as shorthand for calling [`finish`] and then [`new`]. This
 //! isn't listed above, though, since it still returns another accumulator you
 //! have to handle.
@@ -299,7 +299,7 @@
 //! [`err_or_else`]: Accumulator::err_or_else
 //! [`checkpoint`]: Accumulator::checkpoint
 
-use crate::{CompoundError, IntoResultParts};
+use crate::{FusedError, IntoResultParts};
 
 use std::fmt::{self, Debug};
 
@@ -317,7 +317,7 @@ mod raw;
 /// [module documentation]: self
 #[must_use = "accumulators will panic on drop if not handled"]
 pub struct Accumulator<E> {
-    // This is `pub(crate)` for low-level access by result::raw::CompoundResult.
+    // This is `pub(crate)` for low-level access by result::raw::FusedResult.
     pub(crate) inner: raw::Accumulator<E>,
 }
 
@@ -332,7 +332,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<&str>::new();
     ///
@@ -360,7 +360,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let vec = vec!["foo", "bar"];
     /// let mut acc = Accumulator::from_vec(vec);
@@ -379,7 +379,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let vec = vec!["foo", "bar"];
     /// let mut acc = Accumulator::from_vec(vec);
@@ -399,7 +399,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<&str>::new();
     /// assert!(acc.is_empty());
@@ -421,7 +421,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let vec = vec!["foo", "bar"];
     /// let mut acc = Accumulator::from_vec(vec);
@@ -445,7 +445,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let vec = vec![" foo\n", " bar\n"];
     /// let mut acc = Accumulator::from_vec(vec);
@@ -476,7 +476,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// // We're collecting `String` errors, so `push` can except anything that
     /// // implements `Into<String>`.
@@ -493,7 +493,7 @@ impl<E> Accumulator<E> {
     /// [`IntoIterator`] instead:
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<String>::new();
     ///
@@ -542,7 +542,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<String>::new();
     /// acc.trace(String::from("foo"));
@@ -578,7 +578,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<&str>::new();
     ///
@@ -594,7 +594,7 @@ impl<E> Accumulator<E> {
     /// Similar to using [`extend`], consider using `trace_iter`:
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<&str>::new();
     /// acc.push("foo");
@@ -644,7 +644,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<String>::new();
     /// acc.trace_with(||"foo");
@@ -685,7 +685,7 @@ impl<E> Accumulator<E> {
     ///
     /// ```
     /// use std::num::ParseIntError;
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<ParseIntError>::new();
     /// assert_eq!(acc.handle("1".parse::<i32>()), Some(1));
@@ -729,7 +729,7 @@ impl<E> Accumulator<E> {
     ///
     /// ```
     /// use std::num::ParseIntError;
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<ParseIntError>::new();
     ///
@@ -772,7 +772,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<&str>::new();
     /// acc.push("foo");
@@ -799,7 +799,7 @@ impl<E> Accumulator<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulator;
+    /// use fused_error::Accumulator;
     ///
     /// let mut acc = Accumulator::<&str>::new();
     /// acc.push("foo");
@@ -825,17 +825,17 @@ impl<E> Accumulator<E> {
 
 impl<E> Accumulator<E>
 where
-    E: CompoundError,
+    E: FusedError,
 {
     /// Returns `Ok(())` if the accumulator is empty, otherwise reduces the
-    /// [`CompoundError`] type into `Err(E)`.
+    /// [`FusedError`] type into `Err(E)`.
     ///
     /// Calling this method ensures the accumulator **will not** panic on drop.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, Accumulator};
+    /// use fused_error::{Accumulated, Accumulator};
     ///
     /// type Error = Accumulated<String>;
     ///
@@ -852,14 +852,14 @@ where
     }
 
     /// Returns `None` if the accumulator is empty, otherwise reduces the
-    /// [`CompoundError`] type into `Some(E)`.
+    /// [`FusedError`] type into `Some(E)`.
     ///
     /// Calling this method ensures the accumulator **will not** panic on drop.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, Accumulator};
+    /// use fused_error::{Accumulated, Accumulator};
     ///
     /// let mut acc = Accumulator::<Accumulated<&str>>::new();
     /// assert_eq!(acc.err(), None);
@@ -877,7 +877,7 @@ where
     }
 
     /// Returns `Ok(ok)` if the accumulator is empty, otherwise reduces the
-    /// [`CompoundError`] type into `Err(E)`.
+    /// [`FusedError`] type into `Err(E)`.
     ///
     /// Calling this method ensures the accumulator **will not** panic on drop.
     ///
@@ -888,7 +888,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, Accumulator};
+    /// use fused_error::{Accumulated, Accumulator};
     ///
     /// let mut acc = Accumulator::<Accumulated<&str>>::new();
     /// assert_eq!(acc.err_or(0), Ok(0));
@@ -907,14 +907,14 @@ where
     }
 
     /// Returns `Ok(f())` if the accumulator is empty, otherwise reduces the
-    /// [`CompoundError`] type into `Err(E)`.
+    /// [`FusedError`] type into `Err(E)`.
     ///
     /// Calling this method ensures the accumulator **will not** panic on drop.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, Accumulator};
+    /// use fused_error::{Accumulated, Accumulator};
     ///
     /// let mut acc = Accumulator::<Accumulated<&str>>::new();
     /// assert_eq!(acc.err_or_else(|| 0), Ok(0));
@@ -936,7 +936,7 @@ where
     }
 
     /// Returns `Ok(Accumulator<E>)` if the accumulator is empty, otherwise
-    /// reduces the [`CompoundError`] type into `Err(E)`.
+    /// reduces the [`FusedError`] type into `Err(E)`.
     ///
     /// This method is particularly useful for short-circuiting with the
     /// [`?`](std::ops::Try) operator.
@@ -944,7 +944,7 @@ where
     /// # Examples
     ///
     /// ```should_panic
-    /// use compound_error::{Accumulated, Accumulator};
+    /// use fused_error::{Accumulated, Accumulator};
     ///
     /// # fn main() -> Result<(), Accumulated<String>> {
     /// let mut acc = Accumulator::<Accumulated<String>>::new();

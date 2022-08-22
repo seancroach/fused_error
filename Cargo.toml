@@ -1,16 +1,16 @@
 [package]
-name = "compound_error"
+name = "fused_error"
 version = "0.1.0" # update html_root_url in src/lib.rs and README.md
 
 authors = ["Sean C. Roach <me@seancroach.dev>"]
 categories = ["rust-patterns", "development-tools::procedural-macro-helpers"]
 description = "A simple library for working with composable errors."
-documentation = "https://docs.rs/compound_error"
+documentation = "https://docs.rs/fused_error"
 edition = "2021"
 keywords = ["error-handling", "error"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/seancroach/compound_error"
+repository = "https://github.com/seancroach/fused_error"
 
 [dependencies.syn]
 version = "1"

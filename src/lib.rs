@@ -11,14 +11,14 @@
 //!     str::FromStr
 //! };
 //!
-//! use compound_error::{Accumulator, CompoundResult, IteratorExt};
+//! use fused_error::{Accumulator, FusedResult, IteratorExt};
 //!
 //! /// Take an iterator of textual data, adding up all of the parsed numbers.
 //! ///
 //! /// Unlike the standard way of returning a `Result<N, N::Err>`, this doesn't
 //! /// short-circuit, it keeps track of the current sum, and reports any
 //! /// further diagnostics past the first failure.
-//! fn calculate_sum<N, E, I>(iter: I) -> CompoundResult<N, N::Err>
+//! fn calculate_sum<N, E, I>(iter: I) -> FusedResult<N, N::Err>
 //! where
 //!     N: FromStr + Sum,
 //!     E: AsRef<str>,
@@ -30,21 +30,21 @@
 //!     let sum = iter
 //!         .into_iter()
 //!         .map(|item| item.as_ref().parse::<N>())
-//!         // `compound_error` adds certain methods to iterators; no more
+//!         // `fused_error` adds certain methods to iterators; no more
 //!         // disrupting iterator chains and `collect` hells for results!
 //!         .accumulate(&mut acc)
 //!         .sum();
-//!     // Compound results let you easily pass around error accumulators and
+//!     // fused results let you easily pass around error accumulators and
 //!     // are perfect for cases where a yielded "ok" value and an error case
 //!     // aren't mutually exclusive.
-//!     CompoundResult::new(sum, acc)
+//!     FusedResult::new(sum, acc)
 //! }
 //!
-//! let result: CompoundResult<i32, _> = calculate_sum(["1", "2", "3", "4"]);
+//! let result: FusedResult<i32, _> = calculate_sum(["1", "2", "3", "4"]);
 //! assert_eq!(result.value(), &10);
 //! assert_eq!(result.errors(), []);
 //!
-//! let result: CompoundResult<i8, _> = calculate_sum(["", "-129", "foo", "128"]);
+//! let result: FusedResult<i8, _> = calculate_sum(["", "-129", "foo", "128"]);
 //! assert_eq!(result.value(), &0);
 //! assert_eq!(
 //!     result
@@ -60,7 +60,7 @@
 //!     ],
 //! );
 //!
-//! let result: CompoundResult<u8, _> = calculate_sum(["-1", "", "0", "1"]);
+//! let result: FusedResult<u8, _> = calculate_sum(["-1", "", "0", "1"]);
 //! assert_eq!(result.value(), &1);
 //! assert_eq!(
 //!     result
@@ -75,7 +75,7 @@
 //! # Features
 //!
 //! So far, there is only one opt-in feature: `syn`. Enabling this feature
-//! implements [`CompoundError`] on [`syn::Error`], as that was one of the main
+//! implements [`FusedError`] on [`syn::Error`], as that was one of the main
 //! motivations for creating this library.
 //!
 //! # Motivation
@@ -93,8 +93,8 @@
 //!
 //! [`darling`]: https://docs.rs/darling/latest/darling/
 
-// compound_error types in rustdoc of other crates get linked to here
-#![doc(html_root_url = "https://docs.rs/compound_error/0.1.0")]
+// fused_error types in rustdoc of other crates get linked to here
+#![doc(html_root_url = "https://docs.rs/fused_error/0.1.0")]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![warn(missing_docs)]
 #![warn(clippy::pedantic)]
@@ -112,24 +112,24 @@ pub use accumulator::Accumulator;
 #[doc(inline)]
 pub use iter::IteratorExt;
 #[doc(inline)]
-pub use result::{CompoundResult, PackedResult};
+pub use result::{FusedResult, PackedResult};
 
 /// Interface for error types that can store multiple error messages within one
 /// instance.
 ///
-/// Instead of making your own newtype to implement `CompoundError` on a remote
+/// Instead of making your own newtype to implement `FusedError` on a remote
 /// error type, consider using [`Accumulated`] instead.
 ///
 /// # Examples
 ///
 /// ```
-/// use compound_error::{Accumulated, CompoundError};
+/// use fused_error::{Accumulated, FusedError};
 ///
 /// struct Error<'a> {
 ///     messages: Vec<&'a str>,
 /// }
 ///
-/// impl CompoundError for Error<'_> {
+/// impl FusedError for Error<'_> {
 ///     fn combine(&mut self, mut other: Self) {
 ///         self.messages.append(&mut other.messages);
 ///     }
@@ -141,18 +141,18 @@ pub use result::{CompoundResult, PackedResult};
 /// err1.combine(err2);
 /// assert_eq!(err1.messages, ["foo", "bar", "baz"]);
 /// ```
-pub trait CompoundError: Sized {
+pub trait FusedError: Sized {
     /// Drains `other`'s error messages into `self`'s error messages.
     ///
     /// If you find yourself frequently calling `err.combine(other)` only to
     /// return `err`, consider using [`merge`] instead.
     ///
-    /// [`merge`]: CompoundError::merge
+    /// [`merge`]: FusedError::merge
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, CompoundError};
+    /// use fused_error::{Accumulated, FusedError};
     ///
     /// let mut err1 = Accumulated::from("foo");
     /// let err2 = Accumulated::from(vec!["bar", "baz"]);
@@ -168,12 +168,12 @@ pub trait CompoundError: Sized {
     /// Calls [`combine`] and returns `self` as a convenience for closures that
     /// need to return `Self` like [`Iterator::fold`] or [`Iterator::reduce`].
     ///
-    /// [`combine`]: CompoundError::combine
+    /// [`combine`]: FusedError::combine
     ///
     /// # Examples
     ///
     /// ```
-    /// use compound_error::{Accumulated, CompoundError};
+    /// use fused_error::{Accumulated, FusedError};
     ///
     /// let errors = [
     ///     Accumulated::from("foo"),
@@ -194,7 +194,7 @@ pub trait CompoundError: Sized {
 
 #[cfg(feature = "syn")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "syn")))]
-impl CompoundError for syn::Error {
+impl FusedError for syn::Error {
     #[inline]
     fn combine(&mut self, other: Self) {
         self.combine(other);
@@ -233,7 +233,7 @@ pub unsafe trait IntoResultParts {
     /// [`Result<T, E>`](Result) implements `IntoResultParts<T, E>`:
     ///
     /// ```
-    /// use compound_error::IntoResultParts;
+    /// use fused_error::IntoResultParts;
     ///
     /// let result = "1".parse::<i32>();
     /// let (ok, error) = result.into_result_parts();
@@ -241,20 +241,20 @@ pub unsafe trait IntoResultParts {
     /// assert!(error.is_none());
     /// ```
     ///
-    /// [`CompoundResult<T, E>`](CompoundResult) also implements
-    /// `IntoResultParts<T, E>` when `E` implements [`CompoundError`].n
+    /// [`FusedResult<T, E>`](FusedResult) also implements
+    /// `IntoResultParts<T, E>` when `E` implements [`FusedError`].n
     ///
-    /// It is also **guaranteed** that the "ok" part for a compound result is
+    /// It is also **guaranteed** that the "ok" part for a fused result is
     /// **always** [`Some(T)`](Some).
     ///
     /// ```
-    /// use compound_error::{Accumulated, Accumulator, CompoundResult, IntoResultParts};
+    /// use fused_error::{Accumulated, Accumulator, FusedResult, IntoResultParts};
     ///
     /// let mut acc = Accumulator::<Accumulated<&str>>::new();
     /// acc.push("foo");
     /// acc.push("bar");
     ///
-    /// let result = CompoundResult::new(1i32, acc);
+    /// let result = FusedResult::new(1i32, acc);
     /// let (ok, error) = result.into_result_parts();
     /// assert_eq!(ok.unwrap(), 1);
     /// assert_eq!(error.unwrap(), ["foo", "bar"]);
@@ -279,8 +279,8 @@ unsafe impl<T, E> IntoResultParts for Result<T, E> {
 /// A prelude to import the main items exported by this library:
 ///
 /// * [`Accumulator<E>`]
-/// * [`CompoundError`]
-/// * [`CompoundResult<T, E>`](CompoundResult)
+/// * [`FusedError`]
+/// * [`FusedResult<T, E>`](FusedResult)
 /// * [`IteratorExt`]
 /// * [`PackedResult<T, E>`](PackedResult)
 ///
@@ -292,7 +292,7 @@ pub mod prelude {
     pub use crate::{
         accumulator::Accumulator,
         iter::IteratorExt,
-        result::{CompoundResult, PackedResult},
-        CompoundError,
+        result::{FusedResult, PackedResult},
+        FusedError,
     };
 }

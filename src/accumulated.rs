@@ -1,6 +1,6 @@
 //! Working with remote error types using [`Accumulated<E>`].
 
-use crate::CompoundError;
+use crate::FusedError;
 
 use std::{
     borrow::{Borrow, BorrowMut},
@@ -10,15 +10,15 @@ use std::{
 };
 
 /// A thin wrapper to handle remote error types as if they implemented
-/// [`CompoundError`].
+/// [`FusedError`].
 ///
 /// # Examples
 ///
 /// ```
-/// use compound_error::{Accumulated, Accumulator};
+/// use fused_error::{Accumulated, Accumulator};
 ///
 /// // `Accumulated<E>` is needed since Rust's "orphan rule" won't allow you to
-/// // implement `CompoundError` on `String`:
+/// // implement `FusedError` on `String`:
 /// type Error = Accumulated<String>;
 ///
 /// let mut acc = Accumulator::<Error>::new();
@@ -42,7 +42,7 @@ impl<E> Accumulated<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulated;
+    /// use fused_error::Accumulated;
     ///
     /// let mut err = Accumulated::new();
     /// # err.push("foo");
@@ -58,7 +58,7 @@ impl<E> Accumulated<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulated;
+    /// use fused_error::Accumulated;
     ///
     /// let mut err = Accumulated::from_vec(vec!["foo", "bar"]);
     /// ```
@@ -73,7 +73,7 @@ impl<E> Accumulated<E> {
     /// # Examples
     ///
     /// ```
-    /// use compound_error::Accumulated;
+    /// use fused_error::Accumulated;
     ///
     /// let mut err = Accumulated::new();
     /// err.push("foo");
@@ -88,7 +88,7 @@ impl<E> Accumulated<E> {
     }
 }
 
-impl<E> CompoundError for Accumulated<E> {
+impl<E> FusedError for Accumulated<E> {
     #[inline]
     fn combine(&mut self, mut other: Self) {
         self.inner.append(&mut other.inner);
