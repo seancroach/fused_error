@@ -94,7 +94,7 @@
 //! [`darling`]: https://docs.rs/darling/latest/darling/
 
 // fused_error types in rustdoc of other crates get linked to here
-#![doc(html_root_url = "https://docs.rs/fused_error/0.1.0")]
+#![doc(html_root_url = "https://docs.rs/fused_error/0.1.1")]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![warn(missing_docs)]
 #![warn(clippy::pedantic)]
