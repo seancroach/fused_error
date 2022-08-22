@@ -7,7 +7,7 @@ A simple library for working with composable errors.
 
 [Build Status]: https://img.shields.io/github/workflow/status/seancroach/fused_error/ci?logo=github
 [actions]: https://github.com/seancroach/fused_error/actions/workflows/ci.yml
-[Latest Version]: https://img.shields.io/crates/v/fused_errorlogo=rust
+[Latest Version]: https://img.shields.io/crates/v/fused_error?logo=rust
 [crates.io]: https://crates.io/crates/fused_error
 
 ## Documentation
