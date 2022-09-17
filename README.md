@@ -12,8 +12,7 @@ A simple library for working with composable errors.
 
 ## Documentation
 
-[Module documentation with examples](https://docs.rs/fused_error). The module documentation also
-includes a comprehensive description of the syntax supported for parsing hex colors.
+[Module documentation with examples](https://docs.rs/fused_error).
 
 ## Usage
 
