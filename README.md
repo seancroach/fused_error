@@ -20,7 +20,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-fused_error = "0.1.1"
+fused_error = "0.1"
 ```
 
 Here's a simple example to demonstrate the power of composable errors:
